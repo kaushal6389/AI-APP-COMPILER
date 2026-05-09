@@ -193,6 +193,5 @@ node apps/demo/server.js
 
 ---
 
-If you want, I can (a) create a short PR description and Loom script for reviewers, and (b) open a PR from a helper branch. Tell me which and I'll prepare both.
 #   A I - A P P - C O M P I L E R  
  
