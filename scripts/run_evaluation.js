@@ -10,9 +10,16 @@ const results = [];
 
 for (const p of prompts) {
   const start = Date.now();
+  // Clear the existing manifest if any
+  const appOutDir = path.join(process.cwd(), '.out', 'app');
+  if (fs.existsSync(appOutDir)) {
+    fs.rmSync(appOutDir, { recursive: true, force: true });
+  }
+
   // Use the existing pipeline runner with an env var to inject prompt
   const env = { ...process.env, AI_PIPELINE_PROMPT: p.prompt };
   const r = spawnSync('node', ['packages/pipeline/run_test.js'], { env, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+
   const duration = Date.now() - start;
 
   const output = r.stdout || '';

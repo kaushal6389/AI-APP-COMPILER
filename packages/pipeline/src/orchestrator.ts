@@ -6,6 +6,7 @@ import { RuntimeLayer } from '../../runtime/src';
 import { runDAG, DagNode } from './dag/engine';
 import type { IntentIR, DesignIR, ValidatedManifest } from './ir/types';
 import { runSemanticChecks } from './semantic/checker';
+import { RepairEngine } from '../../repair-engine/src';
 import { runRbacChecks } from './rbac/checker';
 import { DeterministicPipeline } from './ir/deterministic';
 import { createRBACSystem } from './rbac';
@@ -55,7 +56,8 @@ export class CompilerOrchestrator {
             const start = Date.now();
             const intentIR = await this.intentStage.execute(prompt);
             const durationMs = Date.now() - start;
-            const intentConfidence = intentIR.hallucinationRisk === 'Low' ? 0.95 : intentIR.hallucinationRisk === 'Medium' ? 0.78 : 0.6;
+            // Use authoritative normalized confidence from intent debug data when available
+            const intentConfidence = intentIR?.debug?.selectedDomain?.confidence ?? intentIR?.confidence ?? (intentIR.hallucinationRisk === 'Low' ? 0.95 : intentIR.hallucinationRisk === 'Medium' ? 0.78 : 0.6);
             notifyType('INTENT_EXTRACTION_END', { intentIR, durationMs, confidence: intentConfidence });
             return intentIR;
           }
@@ -189,7 +191,52 @@ export class CompilerOrchestrator {
             const outcome = runSemanticChecks(r['INTENT_EXTRACTION'], r['SYSTEM_DESIGN'], r['VALIDATION']);
             const durationMs = Date.now() - start;
             notifyType('SEMANTIC_CHECK_END', { outcome, durationMs });
-            if (!outcome.passed) sendEvent?.({ type: 'SEMANTIC_ISSUES', data: outcome.issues });
+
+            if (!outcome.passed) {
+              // Emit the semantic issues
+              sendEvent?.({ type: 'SEMANTIC_ISSUES', data: outcome.issues });
+
+              // Trigger repair engine to attempt fixes based on semantic issues
+              try {
+                console.log('[SEMANTIC] Triggering RepairEngine due to semantic failures...');
+                const repairer = new RepairEngine();
+                let attempts = 0;
+                const maxAttempts = 3;
+                let totalRepairsApplied = 0;
+                let currentManifest = r['VALIDATION'];
+                let currentOutcome = outcome;
+
+                while (!currentOutcome.passed && attempts < maxAttempts) {
+                  attempts++;
+                  const repaired = await repairer.attemptRepair(currentManifest, currentOutcome.issues || []);
+                  // replace the validation manifest in the running DAG results so downstream nodes use repaired manifest
+                  r['VALIDATION'] = repaired;
+                  currentManifest = repaired;
+
+                  const applied = (repaired as any)?.repairCount ?? (currentOutcome.issues || []).length;
+                  totalRepairsApplied += applied;
+                  sendEvent?.({ type: 'REPAIR_APPLIED', data: { message: `Semantic repair engine applied patches to manifest (attempt ${attempts}).`, repairCount: applied } });
+
+                  // Re-run semantic checks on the repaired manifest
+                  currentOutcome = runSemanticChecks(r['INTENT_EXTRACTION'], r['SYSTEM_DESIGN'], currentManifest);
+                  sendEvent?.({ type: 'SEMANTIC_RECHECK', data: { attempt: attempts, outcome: currentOutcome } });
+                }
+
+                if (!currentOutcome.passed) {
+                  sendEvent?.({ type: 'REPAIR_FAILED', data: { message: 'Semantic repairs did not resolve all issues after multiple attempts.', attempts, issues: currentOutcome.issues } });
+                  throw new Error('Unresolvable semantic issues after repair attempts; aborting pipeline');
+                }
+
+                // final success
+                notifyType('SEMANTIC_REPAIRS_COMPLETE');
+                console.log(`[SEMANTIC] Repairs completed after ${attempts} attempt(s). Total fixes applied: ${totalRepairsApplied}`);
+              } catch (repairErr) {
+                console.error('[SEMANTIC] Repair engine failed:', String(repairErr));
+                sendEvent?.({ type: 'REPAIR_FAILED', data: String(repairErr) });
+                throw repairErr;
+              }
+            }
+
             return outcome;
           }
         },

@@ -4,6 +4,19 @@
 import React, { useEffect, useState } from 'react';
 import { AppManifest, DesignIR, IntentIR } from '@ai-compiler/schemas';
 
+// dynamic mermaid loader helper
+async function loadMermaid() {
+  if (typeof window === 'undefined') return null;
+  if ((window as any).mermaid) return (window as any).mermaid;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js';
+    s.onload = () => resolve((window as any).mermaid);
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
 export type PipelineArtifacts = {
   outDir: string;
   files: string[];
@@ -39,6 +52,7 @@ export default function Dashboard() {
   });
   const [benchmarkState, setBenchmarkState] = useState<any>(null);
   const [benchmarkRunning, setBenchmarkRunning] = useState(false);
+  const [compiling, setCompiling] = useState(false);
   const [artifactView, setArtifactView] = useState({
     manifest: true,
     summary: true,
@@ -64,7 +78,34 @@ export default function Dashboard() {
         console.error('Failed to load prompt history', error);
       }
     }
+    // attempt to render mermaid when designIR changes
   }, []);
+
+  useEffect(() => {
+    const renderMermaidDiagram = async () => {
+      if (!pipelineState.designIR?.modules?.length) return;
+      try {
+        const mermaid = await loadMermaid();
+        const modules = pipelineState.designIR.modules.map((m: any) => m.name.replace(/\s+/g, '_'));
+        const edges = pipelineState.designIR.modules.map((m: any, i: number) => ({ from: m.name.replace(/\s+/g, '_'), to: pipelineState.designIR.modules[i + 1]?.name?.replace(/\s+/g, '_') })).filter(Boolean);
+        let diagram = 'graph LR\n';
+        for (const m of modules) diagram += `  ${m}["${m}"]\n`;
+        for (const e of edges) diagram += `  ${e.from} --> ${e.to}\n`;
+        const container = document.getElementById('mermaid-diagram');
+        if (!container) return;
+        // render
+        (window as any).mermaid?.initialize({ startOnLoad: false });
+        (window as any).mermaid?.render('mmd', diagram, (svgCode: string) => {
+          container.innerHTML = svgCode;
+        });
+      } catch (e) {
+        // fallback: show simple list
+        const container = document.getElementById('mermaid-diagram');
+        if (container) container.innerText = pipelineState.designIR.modules.map((m: any) => m.name).join(' -> ');
+      }
+    };
+    renderMermaidDiagram();
+  }, [pipelineState.designIR]);
 
   const updatePromptHistory = (currentPrompt: string) => {
     const trimmed = currentPrompt.trim();
@@ -113,6 +154,14 @@ export default function Dashboard() {
       message: typeof event.data === 'string' ? event.data : 'Repair applied'
     }));
 
+  // Make repair action clickable: apply suggested fix by appending to prompt and re-running
+  const applyRepair = async (actionMessage: string) => {
+    const tuned = `${prompt}\n\n# Apply repair: ${actionMessage}`;
+    setPrompt(tuned);
+    // Small delay to let UI update
+    setTimeout(() => handleCompile(), 200);
+  };
+
   const manifestIntegrity = (() => {
     const required = pipelineState.intentIR?.requiredEntities?.map((entity: any) => entity.name) || [];
     const dbEntities = pipelineState.targetManifest?.database?.map((db: any) => db.name) || [];
@@ -124,6 +173,34 @@ export default function Dashboard() {
       missingRoutes,
       isHealthy: missingEntities.length === 0 && missingRoutes.length === 0
     };
+  })();
+
+  // Prompt-tune suggestions based on validation logs
+  const promptTuneSuggestions = (() => {
+    const suggestions: Array<{ id: string; message: string }> = [];
+    for (const v of pipelineState.validationLogs || []) {
+      const m = v.message || '';
+      const match = /Intent requires entity '?(\w+)'?/i.exec(m) || /requires entity '?(\w+)'?/i.exec(m);
+      if (match) {
+        const ent = match[1];
+        suggestions.push({ id: `entity-${ent}`, message: `Include entity ${ent} with fields` });
+      }
+      const roleMatch = /Primary role '?(\w+)'? not present/i.exec(m);
+      if (roleMatch) suggestions.push({ id: `role-${roleMatch[1]}`, message: `Mention role ${roleMatch[1]} in prompt` });
+    }
+    // dedupe
+    return suggestions.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i);
+  })();
+
+  const semanticIssues = (() => {
+    const semEvent = pipelineState.trace.find((ev: any) => ev.type === 'SEMANTIC_ISSUES');
+    const validationEvents = pipelineState.trace.filter((ev: any) => ev.type === 'VALIDATION_FAILED');
+    const sem = semEvent?.data || [];
+    const val = validationEvents.map((e: any) => (Array.isArray(e.data) ? e.data : [e.data])).flat();
+    const combined = [] as any[];
+    if (Array.isArray(sem)) combined.push(...sem);
+    if (Array.isArray(val)) combined.push(...val.filter(Boolean));
+    return combined;
   })();
 
   const handleCompile = async () => {
@@ -141,6 +218,7 @@ export default function Dashboard() {
       codeArtifacts: null
     });
 
+    setCompiling(true);
     try {
       const response = await fetch('/api/compile', {
         method: 'POST',
@@ -169,6 +247,75 @@ export default function Dashboard() {
     } catch (error) {
       console.error(error);
       alert("Network Error calling execution engine.");
+    }
+    finally {
+      setCompiling(false);
+    }
+  };
+
+  // Live streaming compilation via fetch SSE parser
+  const startLiveCompile = async () => {
+    if (!prompt) return;
+    setCompiling(true);
+    setPipelineState({ stage: 0, intentIR: null, designIR: null, targetManifest: null, validationLogs: [], trace: [], summary: null, codeArtifacts: null });
+
+    try {
+      const resp = await fetch('/api/compile/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+
+      if (!resp.body) throw new Error('No streaming body');
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let parts = buf.split('\n\n');
+        buf = parts.pop() || '';
+        for (const part of parts) {
+          if (!part.trim()) continue;
+          // parse SSE field(s)
+          const lines = part.split('\n').map(l => l.trim());
+          let event = 'message';
+          let data = '';
+          for (const ln of lines) {
+            if (ln.startsWith('event:')) event = ln.replace(/^event:\s*/i, '');
+            if (ln.startsWith('data:')) data += ln.replace(/^data:\s*/i, '');
+          }
+          try {
+            const parsed = JSON.parse(data);
+            // handle event types
+            if (event === 'COMPLETE') {
+              const artifacts = parsed;
+              setPipelineState(prev => ({ ...prev, intentIR: artifacts.intentIR || prev.intentIR, designIR: artifacts.designIR || prev.designIR, targetManifest: artifacts.manifest || prev.targetManifest, trace: artifacts.trace || prev.trace, summary: artifacts.summary || prev.summary, codeArtifacts: artifacts.codeArtifacts || prev.codeArtifacts }));
+            } else if (event === 'ERROR') {
+              alert('Pipeline error: ' + (parsed.error || JSON.stringify(parsed)));
+            } else if (parsed && parsed.type) {
+              // append event
+              setPipelineState(prev => ({ ...prev, trace: [...(prev.trace || []), parsed] }));
+              // update intent/design when INTENT_EXTRACTION_END or SYSTEM_DESIGN_END
+              if (parsed.type === 'INTENT_EXTRACTION_END' && parsed.data?.intentIR) {
+                setPipelineState(prev => ({ ...prev, intentIR: parsed.data.intentIR }));
+              }
+              if (parsed.type === 'SYSTEM_DESIGN_END' && parsed.data?.designIR) {
+                setPipelineState(prev => ({ ...prev, designIR: parsed.data.designIR }));
+              }
+            }
+          } catch (e) {
+            // ignore parse errors
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Live compile failed', e);
+      alert('Live compile failed: ' + (e as any).message);
+    } finally {
+      setCompiling(false);
     }
   };
 
@@ -224,6 +371,40 @@ export default function Dashboard() {
       <h1 className="text-3xl font-bold mb-4">AI App Compiler Architecture</h1>
       
       <div className="grid grid-cols-3 gap-6">
+        {/* Top quick summary and progress */}
+          <div className="col-span-3 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-gray-300">Pipeline Status</div>
+              <div className="text-lg font-semibold">{compiling ? 'Running...' : (pipelineState.summary?.completed ? 'Completed' : 'Idle')}</div>
+            </div>
+            <div className="w-1/2">
+              <div className="h-3 bg-gray-700 rounded overflow-hidden">
+                <div
+                  className="h-3 bg-emerald-400"
+                  style={{ width: `${Math.min(100, (pipelineState.trace.length / 6) * 100)}%` }}
+                />
+              </div>
+              <div className="text-xs text-gray-400 mt-1">Stages complete: {Math.min(6, pipelineState.trace.length)}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={compiling}
+                onClick={handleCompile}
+                className="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded disabled:opacity-60"
+              >
+                {compiling ? 'Running...' : 'Re-run'}
+              </button>
+              <button
+                disabled={compiling}
+                onClick={startLiveCompile}
+                className="bg-rose-600 hover:bg-rose-500 px-3 py-1 rounded disabled:opacity-60"
+              >
+                {compiling ? 'Streaming...' : 'Live Stream'}
+              </button>
+            </div>
+          </div>
+        </div>
         {/* Left Column: Input */}
         <div className="col-span-1 bg-gray-800 p-4 rounded-xl border border-gray-700">
           <h2 className="text-xl mb-2">1. Input Requirements</h2>
@@ -284,6 +465,30 @@ export default function Dashboard() {
         {/* Middle Column: Pipeline View */}
         <div className="col-span-1 bg-gray-800 p-4 rounded-xl border border-gray-700">
           <h2 className="text-xl mb-4">2. Execution Trace</h2>
+          {semanticIssues.length > 0 && (
+            <div className="mb-4 p-3 rounded border-l-4 border-red-500 bg-red-900">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-red-200">Pipeline Issues: {semanticIssues.length}</div>
+                  <div className="text-xs text-red-300 mt-1">The compiler detected semantic/validation issues — review before deploying.</div>
+                </div>
+                <div>
+                  <button
+                    onClick={() => { toggleArtifactView('validation'); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
+                    className="text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded text-white"
+                  >
+                    Open Validation Logs
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-red-200">
+                {semanticIssues.slice(0,3).map((it: any, idx: number) => (
+                  <div key={idx} className="truncate">- {it.message || JSON.stringify(it)}</div>
+                ))}
+                {semanticIssues.length > 3 && <div className="text-xs text-red-400">+{semanticIssues.length - 3} more</div>}
+              </div>
+            </div>
+          )}
           <div className="text-xs text-gray-400 mb-4">
             {pipelineState.trace.length > 0 ? `Events: ${pipelineState.trace.length}` : 'Awaiting execution...'}
           </div>
@@ -352,6 +557,15 @@ export default function Dashboard() {
               {pipelineState.stage >= 6 ? "✔" : "⏳"} [Stage 6] Runtime Code Transpilation
             </li>
           </ul>
+          {/* Architecture DAG visualization (simple boxes + arrows) */}
+          {pipelineState.designIR?.modules?.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm text-gray-400">Architecture (Modules)</h3>
+              <div className="mt-2">
+                <div id="mermaid-diagram" className="bg-gray-950 p-4 rounded" />
+              </div>
+            </div>
+          )}
           {pipelineState.trace.length > 0 && (
             <pre className="mt-4 bg-gray-950 p-2 rounded text-xs overflow-x-auto text-green-300">
               {JSON.stringify(pipelineState.trace.map((event: any) => ({
@@ -441,11 +655,27 @@ export default function Dashboard() {
             <div className="bg-gray-950 p-2 rounded text-xs text-orange-200">
               {repairActions.length > 0
                 ? repairActions.map((action: any) => (
-                    <div key={action.id}>#{action.id} {action.message}</div>
+                    <div key={action.id} className="flex items-center justify-between">
+                      <div className="truncate">#{action.id} {action.message}</div>
+                      <button onClick={() => applyRepair(action.message)} className="ml-2 text-xs bg-emerald-600 hover:bg-emerald-500 px-2 py-1 rounded">Apply</button>
+                    </div>
                   ))
                 : "// No repairs applied"}
             </div>
           </div>
+          {promptTuneSuggestions.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm text-gray-400">Quick Prompt Tune</h3>
+              <div className="bg-gray-950 p-2 rounded text-xs text-amber-200 space-y-2">
+                {promptTuneSuggestions.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between">
+                    <div className="truncate">{s.message}</div>
+                    <button onClick={() => { setPrompt(prev => `${prev}\n\n# Suggestion: ${s.message}`); setTimeout(() => handleCompile(), 200); }} className="ml-2 text-xs bg-amber-600 hover:bg-amber-500 px-2 py-1 rounded">Apply</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <button
               onClick={() => toggleArtifactView('artifacts')}

@@ -22,6 +22,12 @@ export type DomainKey =
   | 'AIHiringPlatform'
   | 'LegalAIPlatform'
   | 'ContentPlatform'
+  | 'DevOpsPlatform'
+  | 'CompilerPlatform'
+  | 'ObservabilitySystem'
+  | 'TradingSystem'
+  | 'WorkflowAutomation'
+  | 'DistributedSystem'
   | 'GenericTask';
 
 export interface DomainEntity {
@@ -44,8 +50,14 @@ export interface DomainProfile {
   requiredEntities: DomainEntity[];
   optionalEntities: DomainEntity[];
   integrationKeywords: Record<string, string>;
-  architecturePattern?: string; // e.g., "Multi-tenant SaaS"
+  architecturePattern?: string; // e.g., "Multi-tenant SaaS", "Event-driven Microservices"
   complianceRequirements?: string[]; // e.g., ["HIPAA", "GDPR"]
+  
+  // Semantic Architecture Synthesis Features
+  expectedWorkflows?: string[];
+  expectedAIModules?: string[];
+  infrastructurePatterns?: string[];
+  collaborationPatterns?: string[];
 }
 
 export const DOMAIN_ONTOLOGY: Record<DomainKey, DomainProfile> = {
@@ -343,6 +355,134 @@ export const DOMAIN_ONTOLOGY: Record<DomainKey, DomainProfile> = {
     ],
     optionalEntities: [],
     integrationKeywords: {}
+  },
+
+  // ============================================================
+  // ADVANCED SYSTEMS AND DOMAINS
+  // ============================================================
+  
+  DevOpsPlatform: {
+    keywords: ['devops', 'ci', 'cd', 'pipeline', 'deployment', 'runner', 'build', 'infrastructure', 'provision'],
+    alternateNames: ['infrastructure platform', 'continuous integration', 'build system'],
+    defaultRoles: [
+      { name: 'Admin', description: 'Platform admin', isSystem: true },
+      { name: 'Engineer', description: 'Systems engineer', isSystem: false }
+    ],
+    requiredEntities: [
+      { name: 'PipelineRun', corePurpose: 'Execution state', isDomainCritical: true, suggestedFields: ['status', 'startedAt', 'completedAt', 'trigger'] },
+      { name: 'ExecutionDAG', corePurpose: 'Task dependency graph', isDomainCritical: true, suggestedFields: ['runId', 'nodes', 'edges', 'status'] },
+      { name: 'WorkerNode', corePurpose: 'Execution agent', isDomainCritical: true, suggestedFields: ['hostname', 'status', 'capacity', 'labels'] }
+    ],
+    optionalEntities: [
+      { name: 'QueueJob', corePurpose: 'Scheduled task', isDomainCritical: false, suggestedFields: ['payload', 'retries', 'workerId'] },
+      { name: 'CompilerDiagnostic', corePurpose: 'Build error/log', isDomainCritical: false, suggestedFields: ['runId', 'msg', 'level'] }
+    ],
+    integrationKeywords: { github: 'VCS', aws: 'Cloud' },
+    architecturePattern: 'Distributed Orchestration Engine',
+    expectedWorkflows: ['Pipeline Execution', 'Worker Provisioning', 'Log Collection'],
+    infrastructurePatterns: ['Message Queue', 'Worker Fleet', 'DAG Executor']
+  },
+
+  CompilerPlatform: {
+    keywords: ['compiler', 'synthesizer', 'generator', 'ast', 'ir', 'transpile', 'code generation'],
+    alternateNames: ['ai software engineering platform', 'code generator', 'architecture synthesizer'],
+    defaultRoles: [
+      { name: 'Admin', description: 'Platform Administrator', isSystem: true },
+      { name: 'Architect', description: 'System designer', isSystem: false }
+    ],
+    requiredEntities: [
+      { name: 'CompilationSession', corePurpose: 'Session tracker', isDomainCritical: true, suggestedFields: ['prompt', 'status', 'artifacts'] },
+      { name: 'ExecutionDAG', corePurpose: 'Pipeline stages', isDomainCritical: true, suggestedFields: ['sessionId', 'stages', 'errors'] },
+      { name: 'CompilerDiagnostic', corePurpose: 'System errors/logs', isDomainCritical: true, suggestedFields: ['level', 'message', 'stage'] }
+    ],
+    optionalEntities: [
+      { name: 'WorkerNode', corePurpose: 'Generator node', isDomainCritical: false, suggestedFields: ['status', 'uptime'] },
+      { name: 'TelemetryEvent', corePurpose: 'Performance logs', isDomainCritical: false, suggestedFields: ['metric', 'value', 'timestamp'] }
+    ],
+    integrationKeywords: { openai: 'LLM Generation', github: 'Artifact Storage' },
+    architecturePattern: 'Semantic Compilation Engine',
+    expectedWorkflows: ['Lexical Parsing', 'Semantic Synthesis', 'AST Generation', 'Code Emission'],
+    expectedAIModules: ['IntentInferenceModel', 'ArchitectureSynthesisModel', 'SemanticValidator'],
+    infrastructurePatterns: ['Pipeline DAG', 'Cache Layer', 'Diagnostic Aggregator']
+  },
+
+  ObservabilitySystem: {
+    keywords: ['observability', 'telemetry', 'logs', 'metrics', 'tracing', 'apm', 'dashboard', 'monitor'],
+    alternateNames: ['monitoring platform', 'application performance monitoring'],
+    defaultRoles: [
+      { name: 'Admin', description: 'Admin', isSystem: true },
+      { name: 'Operator', description: 'Viewer', isSystem: false }
+    ],
+    requiredEntities: [
+      { name: 'TelemetryEvent', corePurpose: 'Raw log', isDomainCritical: true, suggestedFields: ['service', 'level', 'message', 'timestamp'] },
+      { name: 'Metric', corePurpose: 'Time-series data', isDomainCritical: true, suggestedFields: ['name', 'value', 'tags', 'timestamp'] },
+      { name: 'Alert', corePurpose: 'Triggered condition', isDomainCritical: true, suggestedFields: ['condition', 'severity', 'status'] }
+    ],
+    optionalEntities: [
+      { name: 'Dashboard', corePurpose: 'Visualization', isDomainCritical: false, suggestedFields: ['name', 'panels'] }
+    ],
+    integrationKeywords: { datadog: 'Downstream', pagerduty: 'Alerting' },
+    architecturePattern: 'High-Throughput Ingestion System',
+    expectedWorkflows: ['Event Ingestion', 'Metric Aggregation', 'Anomaly Detection'],
+    infrastructurePatterns: ['Time-Series Datalake', 'Stream Processor']
+  },
+
+  TradingSystem: {
+    keywords: ['trading', 'exchange', 'orderbook', 'crypto', 'stock', 'brokerage', 'matching engine'],
+    alternateNames: ['financial exchange', 'crypto exchange', 'brokerage platform'],
+    defaultRoles: [
+      { name: 'Admin', description: 'Admin', isSystem: true },
+      { name: 'Trader', description: 'User', isSystem: false }
+    ],
+    requiredEntities: [
+      { name: 'Asset', corePurpose: 'Traded symbol', isDomainCritical: true, suggestedFields: ['symbol', 'name', 'type'] },
+      { name: 'Order', corePurpose: 'Trade intent', isDomainCritical: true, suggestedFields: ['assetId', 'side', 'price', 'quantity', 'status'] },
+      { name: 'Ledger', corePurpose: 'Settlement', isDomainCritical: true, suggestedFields: ['userId', 'assetId', 'balance'] }
+    ],
+    optionalEntities: [
+      { name: 'Execution', corePurpose: 'Matched trade', isDomainCritical: false, suggestedFields: ['buyOrderId', 'sellOrderId', 'price'] }
+    ],
+    integrationKeywords: { plaid: 'Fiat Onramp' },
+    architecturePattern: 'Low-Latency Matching Engine',
+    expectedWorkflows: ['Order Submission', 'Matching', 'Settlement'],
+    infrastructurePatterns: ['In-Memory Orderbook', 'Event-Sourced Ledger']
+  },
+
+  WorkflowAutomation: {
+    keywords: ['workflow', 'automation', 'zapier', 'nokia', 'trigger', 'action', 'integration', 'connect'],
+    alternateNames: ['integration platform', 'ipaaS', 'workflow engine'],
+    defaultRoles: [
+      { name: 'Admin', description: 'Admin', isSystem: true },
+      { name: 'Creator', description: 'Workflow builder', isSystem: false }
+    ],
+    requiredEntities: [
+      { name: 'Workflow', corePurpose: 'Rule definition', isDomainCritical: true, suggestedFields: ['name', 'trigger', 'actions', 'status'] },
+      { name: 'Execution', corePurpose: 'Run instance', isDomainCritical: true, suggestedFields: ['workflowId', 'status', 'logs'] },
+      { name: 'Connection', corePurpose: 'OAuth credential', isDomainCritical: true, suggestedFields: ['provider', 'token'] }
+    ],
+    optionalEntities: [],
+    integrationKeywords: {},
+    architecturePattern: 'Event-Driven Automation Engine',
+    expectedWorkflows: ['Webhook Ingestion', 'Step Execution', 'Retry Logic'],
+    infrastructurePatterns: ['Event Bus', 'Worker Queue']
+  },
+
+  DistributedSystem: {
+    keywords: ['distributed', 'cluster', 'node', 'shard', 'partition', 'consensus', 'raft'],
+    alternateNames: ['p2p system', 'cluster management'],
+    defaultRoles: [
+      { name: 'SysAdmin', description: 'Cluster manager', isSystem: true }
+    ],
+    requiredEntities: [
+      { name: 'Node', corePurpose: 'Cluster member', isDomainCritical: true, suggestedFields: ['ip', 'role', 'status', 'heartbeat'] },
+      { name: 'Partition', corePurpose: 'Data shard', isDomainCritical: true, suggestedFields: ['nodeId', 'range', 'replicaSet'] },
+      { name: 'ClusterEvent', corePurpose: 'Topology change', isDomainCritical: true, suggestedFields: ['type', 'newLeader', 'timestamp'] }
+    ],
+    optionalEntities: [],
+    integrationKeywords: {},
+    architecturePattern: 'Leader-Follower Consensus Cluster',
+    expectedWorkflows: ['Heartbeat Tracking', 'Leader Election', 'Data Replication'],
+    infrastructurePatterns: ['Gossip Protocol', 'Consensus Log']
   }
 };
 

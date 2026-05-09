@@ -1,4 +1,5 @@
 import { IntentIR, DesignSchema, DesignIR } from '@ai-compiler/schemas';
+import { DOMAIN_ONTOLOGY, DomainKey } from '../domain/ontology';
 
 /**
  * Stage 2: System Design Layer
@@ -15,20 +16,44 @@ export class SystemDesignStage {
       DomainDataModule: entityNames
     };
 
+    const modules = [
+      {
+        name: 'CoreAccessModule',
+        responsibility: 'Handles identity, authentication, and authorization',
+        dependencies: []
+      },
+      {
+        name: 'DomainDataModule',
+        responsibility: `Manages ${intent.domain} entities and business workflows`,
+        dependencies: ['CoreAccessModule']
+      }
+    ];
+
+    const profile = DOMAIN_ONTOLOGY[intent.domain as DomainKey];
+    if (profile) {
+      if (profile.expectedAIModules) {
+        profile.expectedAIModules.forEach(mod => {
+          modules.push({
+            name: mod,
+            responsibility: `AI logic block for ${mod}`,
+            dependencies: ['DomainDataModule']
+          });
+        });
+      }
+      if (profile.infrastructurePatterns) {
+        profile.infrastructurePatterns.forEach(pattern => {
+          modules.push({
+            name: pattern,
+            responsibility: `Infrastructure support pattern: ${pattern}`,
+            dependencies: ['DomainDataModule']
+          });
+        });
+      }
+    }
+
     const mockDesignJson = {
-      architecture: 'Monolith',
-      modules: [
-        {
-          name: 'CoreAccessModule',
-          responsibility: 'Handles identity, authentication, and authorization',
-          dependencies: []
-        },
-        {
-          name: 'DomainDataModule',
-          responsibility: `Manages ${intent.domain} entities and business workflows`,
-          dependencies: ['CoreAccessModule']
-        }
-      ],
+      architecture: profile?.infrastructurePatterns?.length ? 'Distributed' : 'Monolith',
+      modules,
       entityRelationships: entityNames.slice(0, 2).map((name, index) => ({
         from: name,
         to: entityNames[index + 1] || name,

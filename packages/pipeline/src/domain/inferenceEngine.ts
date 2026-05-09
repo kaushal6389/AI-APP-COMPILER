@@ -48,11 +48,12 @@ const scoreByKeywords = (prompt: string): Map<DomainKey, number> => {
     // Count keyword matches
     let matchCount = 0;
     let totalKeywords = 0;
+    const matchedKeywords: string[] = [];
     
     // Main keywords
     for (const keyword of profile.keywords) {
       totalKeywords++;
-      if (lowered.includes(keyword)) matchCount++;
+      if (lowered.includes(keyword)) { matchCount++; matchedKeywords.push(keyword); }
     }
     
     // Alternate names
@@ -66,6 +67,9 @@ const scoreByKeywords = (prompt: string): Map<DomainKey, number> => {
     // Score is weighted: (matches / total keywords) * 100
     const score = totalKeywords > 0 ? (matchCount / totalKeywords) * 100 : 0;
     scores.set(domain, score);
+    // attach matched keywords for debug inspection
+    (scores as any).__matches = (scores as any).__matches || {};
+    (scores as any).__matches[domain] = matchedKeywords;
   }
   
   return scores;
@@ -128,8 +132,41 @@ const scoreByFeatures = (features: FeatureSet, prompt: string): Map<DomainKey, n
       if (features.hasCollaboration) matchedFeatures++;
     }
     
+    // Abstract systems
+    if (domain === 'DevOpsPlatform') {
+      expectedFeatures += 3;
+      if (features.hasInfrastructure) matchedFeatures++;
+      if (features.hasExecutionDAG) matchedFeatures++;
+      if (features.hasQueue) matchedFeatures++;
+    }
+    
+    if (domain === 'CompilerPlatform') {
+      expectedFeatures += 2;
+      if (features.hasCompiler) matchedFeatures++;
+      if (features.hasExecutionDAG) matchedFeatures++;
+    }
+    
+    if (domain === 'ObservabilitySystem') {
+      expectedFeatures += 2;
+      if (features.hasTelemetry) matchedFeatures++;
+      if (features.hasReporting) matchedFeatures++;
+    }
+
+    if (domain === 'TradingSystem') {
+      expectedFeatures += 2;
+      if (features.hasTrading) matchedFeatures++;
+      if (features.hasAuth) matchedFeatures++;
+    }
+
+    if (domain === 'WorkflowAutomation') {
+      expectedFeatures += 2;
+      if (features.hasAutomation) matchedFeatures++;
+      if (features.hasQueue) matchedFeatures++;
+    }
+    
     // Content platform benefits from search, reporting
     if (domain === 'ContentPlatform') {
+
       expectedFeatures += 2;
       if (features.hasSearch) matchedFeatures++;
       if (features.hasReporting) matchedFeatures++;
@@ -224,6 +261,7 @@ const inferImpliedEntities = (features: FeatureSet): string[] => {
  * @returns Domain inference result with selected domain and alternatives
  */
 export const inferDomain = (prompt: string): DomainInferenceResult => {
+  console.log('[INFER][DEBUG] prompt:', prompt);
   // Step 1: Extract features
   const features = extractFeatures(prompt);
   const detectedFeatures = getDetectedFeatures(features);
@@ -241,6 +279,16 @@ export const inferDomain = (prompt: string): DomainInferenceResult => {
   const sortedDomains = Array.from(combinedScores.entries())
     .map(([domain, score]) => ({ domain, score }))
     .sort((a, b) => b.score - a.score);
+
+  // DEBUG: emit score tables for inspection
+  try {
+    const kvKeywords = Array.from(keywordScores.entries()).map(([d,s])=>`${d}:${s.toFixed(1)}`).join(', ');
+    const kvFeatures = Array.from(featureScores.entries()).map(([d,s])=>`${d}:${s.toFixed(1)}`).join(', ');
+    const kvCombined = Array.from(combinedScores.entries()).map(([d,s])=>`${d}:${s.toFixed(1)}`).join(', ');
+    console.log(`[INFER][DEBUG] keywordScores=${kvKeywords}`);
+    console.log(`[INFER][DEBUG] featureScores=${kvFeatures}`);
+    console.log(`[INFER][DEBUG] combinedScores=${kvCombined}`);
+  } catch (e) {}
   
   // Step 6: Build domain matches with details
   const buildMatch = (domain: DomainKey, score: number, isExact: boolean): DomainMatch => {

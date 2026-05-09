@@ -18,7 +18,27 @@ export class IntentExtractionStage {
     // PHASE 1: Use new semantic domain inference
     const inferenceResult = inferDomain(prompt);
     const selectedDomainMatch = inferenceResult.selectedDomain;
-    const domain = selectedDomainMatch.domain;
+    let domain = selectedDomainMatch.domain;
+
+    // DEBUG: log selection details
+    console.log(`[INTENT][DEBUG] Selected domain: ${domain} (confidence=${selectedDomainMatch.confidence})`);
+    console.log(`[INTENT][DEBUG] Alternatives: ${inferenceResult.alternativeDomains.map(a=>`${a.domain}:${a.confidence.toFixed(2)}`).join(', ')}`);
+
+    // If classifier suggests GenericTask but alternatives have higher confidence, prefer a non-generic alternative.
+    if (domain === 'GenericTask') {
+      const fallbackThreshold = 0.3; // configurable threshold
+      const pick = inferenceResult.alternativeDomains
+        .filter(a => a.domain !== 'GenericTask' && a.confidence >= fallbackThreshold)
+        .sort((a,b) => b.confidence - a.confidence)[0];
+      if (pick) {
+        console.log(`[INTENT][DEBUG] Blocking GenericTask fallback because alternative '${pick.domain}' meets confidence threshold (${pick.confidence}). Switching domain.`);
+        domain = pick.domain;
+      } else {
+        console.log('[INTENT][DEBUG] No suitable non-generic alternative found; keeping GenericTask but will flag for review if needed.');
+      }
+    }
+
+    // After potential domain switch, refresh profile from ontology
     const profile = DOMAIN_ONTOLOGY[domain];
 
     // Extract explicitly defined roles, fallback to domain defaults
@@ -55,6 +75,17 @@ export class IntentExtractionStage {
     console.log(`[INTENT] Detected features: ${selectedDomainMatch.matchedFeatures.join(', ') || 'none'}`);
     console.log(`[INTENT] Entities: ${mergedEntities.map(e => e.name).join(', ')}`);
 
+    // PHASE 4: REMOVE GENERIC CRUD FALLBACK (RELAXED)
+    // Previously we threw hard errors to refuse fallbacks — relax to warnings
+    // to avoid blocking underspecified but innocuous prompts.
+    if (selectedDomainMatch.confidence < 0.10 && lowered.length > 60) {
+      console.warn(`SemanticArchitectureWarning: Low domain confidence (${Math.round(selectedDomainMatch.confidence * 100)}%) for a relatively long prompt; proceeding but marking for review.`);
+    }
+
+    if ((domain === 'GenericTask' || domain === 'CRM') && lowered.length > 200) {
+      console.warn('SemanticArchitectureWarning: Prompt collapsed to GenericTask/CRM but is large; proceeding but flagging for manual inspection.');
+    }
+
     return {
       domain,
       summary: `Semantic domain inference (${domain}) - Confidence: ${Math.round(selectedDomainMatch.confidence * 100)}%`,
@@ -66,6 +97,11 @@ export class IntentExtractionStage {
         'Domain models semantically matched',
         `Inferred from ${selectedDomainMatch.matchedKeywords.length} domain keywords and ${selectedDomainMatch.matchedFeatures.length} features`
       ],
+      debug: {
+        selectedDomain: selectedDomainMatch,
+        alternatives: inferenceResult.alternativeDomains,
+        fallbackReason: domain === 'GenericTask' ? 'generic-fallback' : undefined
+      },
       hallucinationRisk: 
         inferenceResult.hallucinationRisk === 'High' ? 'High' :
         inferenceResult.hallucinationRisk === 'Medium' ? 'Medium' :

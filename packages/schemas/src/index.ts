@@ -17,6 +17,12 @@ export const DomainEnum = z.enum([
   'AIHiringPlatform',      // Phase 1: New domain
   'LegalAIPlatform',       // Phase 1: New domain
   'ContentPlatform',       // Phase 1: New domain
+  'DevOpsPlatform',
+  'CompilerPlatform',
+  'ObservabilitySystem',
+  'TradingSystem',
+  'WorkflowAutomation',
+  'DistributedSystem',
   'GenericTask'
 ]);
 

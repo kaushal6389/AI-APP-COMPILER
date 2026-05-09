@@ -10,7 +10,8 @@ const { CompilerOrchestrator } = require('./src/orchestrator.ts');
   try {
     const orchestrator = new CompilerOrchestrator();
     console.log('Starting pipeline run...');
-    const res = await orchestrator.compile('Create a simple notes app with users and notes', (ev) => {
+const prompt = process.env.AI_PIPELINE_PROMPT || 'Create a simple notes app with users and notes';
+    const res = await orchestrator.compile(prompt, (ev) => {
       try { console.log('EVENT>', JSON.stringify(ev)); } catch(e) { console.log('EVENT>', ev); }
     });
     console.log('PIPELINE RESULT>', JSON.stringify(res, null, 2));

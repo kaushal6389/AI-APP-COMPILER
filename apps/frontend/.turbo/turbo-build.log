@@ -2,25 +2,29 @@
 > ai-app-compiler-frontend@1.0.0 build
 > next build
 
-▲ Next.js 16.2.4 (Turbopack)
+  ▲ Next.js 15.0.0
 
-  Creating an optimized production build ...
-✓ Compiled successfully in 6.4s
-  Running TypeScript ...
-  Finished TypeScript in 5.8s ...
-  Collecting page data using 6 workers ...
-  Generating static pages using 6 workers (0/5) ...
-  Generating static pages using 6 workers (1/5) 
-  Generating static pages using 6 workers (2/5) 
-  Generating static pages using 6 workers (3/5) 
-✓ Generating static pages using 6 workers (5/5) in 892ms
-  Finalizing page optimization ...
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/6) ...
+   Generating static pages (1/6) 
+   Generating static pages (2/6) 
+   Generating static pages (4/6) 
+ ✓ Generating static pages (6/6)
+   Finalizing page optimization ...
+   Collecting build traces ...
 
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-├ ƒ /api/benchmark
-└ ƒ /api/compile
+Route (app)                              Size     First Load JS
+┌ ○ /                                    3.88 kB         103 kB
+├ ○ /_not-found                          897 B           100 kB
+├ ƒ /api/benchmark                       140 B          99.3 kB
+└ ƒ /api/compile                         140 B          99.3 kB
++ First Load JS shared by all            99.1 kB
+  ├ chunks/215-624c6edaceb5ec52.js       44.6 kB
+  ├ chunks/4bd1b696-239c50da69b5278f.js  52.6 kB
+  └ other shared chunks (total)          1.88 kB
 
 
 ○  (Static)   prerendered as static content

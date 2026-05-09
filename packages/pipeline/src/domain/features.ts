@@ -22,6 +22,13 @@ export interface FeatureSet {
   hasFullText: boolean;
   hasWebSocket: boolean;
   hasNotifications: boolean;
+  hasInfrastructure: boolean;
+  hasExecutionDAG: boolean;
+  hasQueue: boolean;
+  hasCompiler: boolean;
+  hasTelemetry: boolean;
+  hasTrading: boolean;
+  hasAutomation: boolean;
 }
 
 // Feature keyword mappings
@@ -68,6 +75,27 @@ const FEATURE_KEYWORDS: Record<keyof FeatureSet, string[]> = {
   hasNotifications: [
     'notification', 'notify', 'alert', 'push notification', 'email notification',
     'messaging', 'message', 'broadcast', 'event stream'
+  ],
+  hasInfrastructure: [
+    'infrastructure', 'worker', 'node', 'cluster', 'provision', 'docker', 'kubernetes', 'scale'
+  ],
+  hasExecutionDAG: [
+    'dag', 'execution graph', 'pipeline', 'workflow graph', 'dependency graph', 'task sequence'
+  ],
+  hasQueue: [
+    'queue', 'job', 'worker pool', 'background task', 'bullmq', 'celery', 'kafka', 'rabbitmq'
+  ],
+  hasCompiler: [
+    'compiler', 'ast', 'syntax tree', 'code generation', 'transpile', 'parser', 'synthesizer'
+  ],
+  hasTelemetry: [
+    'telemetry', 'observability', 'traces', 'metrics', 'datadog', 'prometheus', 'grafana', 'apm'
+  ],
+  hasTrading: [
+    'trading', 'matching engine', 'orderbook', 'exchange', 'crypto', 'stock', 'forex', 'brokerage'
+  ],
+  hasAutomation: [
+    'automation', 'zapier', 'webhook', 'trigger', 'integration', 'rule engine', 'ipaas'
   ]
 };
 
@@ -90,7 +118,14 @@ export const extractFeatures = (prompt: string): FeatureSet => {
     hasSearch: false,
     hasFullText: false,
     hasWebSocket: false,
-    hasNotifications: false
+    hasNotifications: false,
+    hasInfrastructure: false,
+    hasExecutionDAG: false,
+    hasQueue: false,
+    hasCompiler: false,
+    hasTelemetry: false,
+    hasTrading: false,
+    hasAutomation: false
   };
   
   // Check each feature type
@@ -125,6 +160,13 @@ export const getDetectedFeatures = (features: FeatureSet): string[] => {
   if (features.hasFullText) detected.push('Full-Text Search');
   if (features.hasWebSocket) detected.push('WebSocket');
   if (features.hasNotifications) detected.push('Notifications');
+  if (features.hasInfrastructure) detected.push('Infrastructure');
+  if (features.hasExecutionDAG) detected.push('Execution DAG');
+  if (features.hasQueue) detected.push('Job Queues');
+  if (features.hasCompiler) detected.push('Compiler/AST');
+  if (features.hasTelemetry) detected.push('Telemetry/Observability');
+  if (features.hasTrading) detected.push('Trading Engine');
+  if (features.hasAutomation) detected.push('Workflow Automation');
   
   return detected;
 };
