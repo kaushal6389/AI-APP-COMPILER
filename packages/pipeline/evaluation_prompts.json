@@ -1,0 +1,23 @@
+[
+  {"id":1,"type":"normal","prompt":"Build a CRM with login, contacts, dashboard, role-based access, and premium plan with payments. Admins can see analytics."},
+  {"id":2,"type":"normal","prompt":"Create a task manager with projects, tasks, user assignments, and email notifications."},
+  {"id":3,"type":"normal","prompt":"Create a blog platform with posts, comments, admin moderation, and tagging."},
+  {"id":4,"type":"normal","prompt":"Build an e-commerce storefront with products, cart, checkout, and order history."},
+  {"id":5,"type":"normal","prompt":"Create an events app with RSVPs, calendars, and ticket payments."},
+  {"id":6,"type":"normal","prompt":"Build a helpdesk with tickets, agents, SLA rules, and escalation flows."},
+  {"id":7,"type":"normal","prompt":"Create an invoicing app with clients, invoices, recurring billing, and taxes."},
+  {"id":8,"type":"normal","prompt":"Build a social network with profiles, follow, feed, and media upload."},
+  {"id":9,"type":"normal","prompt":"Create a notes app with notebooks, rich text, and sharing permissions."},
+  {"id":10,"type":"normal","prompt":"Build a restaurant reservation system with tables, availability, and confirmation emails."},
+
+  {"id":11,"type":"edge","prompt":"Vague: Build something like Airbnb for boats and events."},
+  {"id":12,"type":"edge","prompt":"Conflicting: Users should be both admins and only see their own data."},
+  {"id":13,"type":"edge","prompt":"Underspecified: Build a payment system — no currency or flow given."},
+  {"id":14,"type":"edge","prompt":"Ambiguous: Make a social app but only for 'special users' — define them."},
+  {"id":15,"type":"edge","prompt":"Contradiction: App with no DB but needs persistent user accounts."},
+  {"id":16,"type":"edge","prompt":"Edge: Build a healthcare scheduling app with PHI fields."},
+  {"id":17,"type":"edge","prompt":"Edge: Create a high-security banking app with multi-sig transfers."},
+  {"id":18,"type":"edge","prompt":"Vague: Create an analytics dashboard for an app that doesn't exist."},
+  {"id":19,"type":"edge","prompt":"Incomplete: Build a CRM but only says 'with contacts' and nothing else."},
+  {"id":20,"type":"edge","prompt":"Stress: 1000 users, realtime updates, and eventual consistency required."}
+]
