@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ai-compiler/schemas": ["packages/schemas/src/index.ts"],
+      "@ai-compiler/pipeline/*": ["packages/pipeline/*"],
+      "@ai-compiler/validators/*": ["packages/validators/*"],
+      "@ai-compiler/repair-engine/*": ["packages/repair-engine/*"],
+      "@ai-compiler/runtime/*": ["packages/runtime/*"],
+      "@ai-compiler/evaluation/*": ["packages/evaluation/*"]
+    }
+  },
+  "ts-node": {
+    "require": ["tsconfig-paths/register"]
+  }
+}

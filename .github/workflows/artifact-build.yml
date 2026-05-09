@@ -1,0 +1,47 @@
+name: Build Artifacts
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate artifacts
+        run: node packages/pipeline/run_test.js
+
+      - name: Run artifact tests
+        run: node .out/app/artifact-tests.js
+
+      - name: Build Docker image
+        run: docker build -t ai-app-compiler-artifact .out/app
+
+      - name: Docker smoke test
+        run: |
+          docker run --rm -d --name ai-app-compiler-artifact-smoke -p 3000:3000 ai-app-compiler-artifact
+          sleep 4
+          docker exec ai-app-compiler-artifact-smoke node /app/artifact-tests.js
+          docker stop ai-app-compiler-artifact-smoke
+
+      - name: Run repair engine tests
+        run: node packages/runtime/src/repair/heuristicRepair.test.js
+
+      - name: Run benchmark evaluation
+        run: npx ts-node --transpile-only packages/pipeline/src/evaluation/cli.ts

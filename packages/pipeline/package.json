@@ -1,0 +1,12 @@
+{
+  "name": "@ai-compiler/pipeline",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "scripts": {
+    "benchmark": "ts-node src/evaluation/cli.ts"
+  },
+  "dependencies": {
+    "@ai-compiler/schemas": "*",
+    "zod": "^3.22.4"
+  }
+}
