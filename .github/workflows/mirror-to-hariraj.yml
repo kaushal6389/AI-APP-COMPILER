@@ -1,0 +1,33 @@
+name: Mirror to Hariraj Repo
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  mirror:
+    name: Mirror to Hariraj
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Push to Hariraj remote
+        env:
+          HARIRAJ_PAT: ${{ secrets.HARIRAJ_PAT }}
+          HARIRAJ_REPO: ${{ secrets.HARIRAJ_REPO }}
+        run: |
+          if [ -z "$HARIRAJ_PAT" ] || [ -z "$HARIRAJ_REPO" ]; then
+            echo "HARIRAJ_PAT or HARIRAJ_REPO not set — skipping mirror push."
+            exit 0
+          fi
+          # Add remote using PAT, then push
+          git remote remove hariraj || true
+          git remote add hariraj https://x-access-token:${HARIRAJ_PAT}@github.com/${HARIRAJ_REPO}.git
+          git push --force --set-upstream hariraj main
