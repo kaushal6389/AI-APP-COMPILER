@@ -56,8 +56,14 @@ export class CompilerOrchestrator {
             const start = Date.now();
             const intentIR = await this.intentStage.execute(prompt);
             const durationMs = Date.now() - start;
-            // Use authoritative normalized confidence from intent debug data when available
-            const intentConfidence = intentIR?.debug?.selectedDomain?.confidence ?? intentIR?.confidence ?? (intentIR.hallucinationRisk === 'Low' ? 0.95 : intentIR.hallucinationRisk === 'Medium' ? 0.78 : 0.6);
+            // Use authoritative normalized confidence from intent debug data when available.
+            // Use `any` casts to avoid TS errors when this code is consumed via path-mapped imports
+            const intentDebugSelectedDomain = (intentIR as any)?.debug?.selectedDomain;
+            const intentConfidence = typeof intentDebugSelectedDomain?.confidence === 'number'
+              ? intentDebugSelectedDomain.confidence
+              : typeof (intentIR as any)?.confidence === 'number'
+                ? (intentIR as any).confidence
+                : (intentIR?.hallucinationRisk === 'Low' ? 0.95 : intentIR?.hallucinationRisk === 'Medium' ? 0.78 : 0.6);
             notifyType('INTENT_EXTRACTION_END', { intentIR, durationMs, confidence: intentConfidence });
             return intentIR;
           }
