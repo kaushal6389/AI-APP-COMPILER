@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "scripts": {
+    "build": "npx esbuild src/orchestrator.ts --bundle --platform=node --outfile=dist/orchestrator.js --target=node18 --external:zod",
+    "build:ts": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
     "benchmark": "ts-node src/evaluation/cli.ts"
   },
   "dependencies": {
